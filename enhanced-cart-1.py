@@ -59,12 +59,11 @@ def weighted_adasyn(X, y, beta=1.0, k=5, weights=None):
 # ============================================================
 df = pd.read_csv("onlinefraud.csv")
 
-# Encode categorical features
 for col in df.select_dtypes(include=['object']).columns:
     le = LabelEncoder()
     df[col] = le.fit_transform(df[col])
 
-df = df.sample(100000, random_state=42) #smaller sample size
+#df = df.sample(100000, random_state=42) #smaller sample size
 
 # Split features and target
 X = df.drop("isFraud", axis=1).values
@@ -73,7 +72,7 @@ y = df["isFraud"].values
 # ============================================================
 # Weighted ADASYN
 # ============================================================
-feature_weights = np.ones(X.shape[1])  # you can tune feature importance here
+feature_weights = np.ones(X.shape[1]) 
 X_resampled, y_resampled = weighted_adasyn(X, y, beta=0.8, k=5, weights=feature_weights)
 
 print("Before ADASYN:", np.bincount(y))
@@ -92,8 +91,8 @@ X_train, X_test, y_train, y_test = train_test_split(
 cart = DecisionTreeClassifier(
     criterion="gini",       # standard Gini (approximating Regularized Gini)
     max_depth=5,            # limits tree growth (stability)
-    min_samples_split=10,   # avoid splits on tiny subsets
-    min_samples_leaf=5,     # ensure enough samples per leaf
+    min_samples_split=10,   
+    min_samples_leaf=5,    
     ccp_alpha=0.001,        # cost-complexity pruning (acts like λ·Complexity(T))
     random_state=42
 )
@@ -115,3 +114,4 @@ print("\n--- Final Enhanced CART Results (with Regularized Gini Approximation) -
 print("Accuracy:", accuracy_score(y_test, y_pred))
 print("\nClassification Report:\n", classification_report(y_test, y_pred))
 print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
+
