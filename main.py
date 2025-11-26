@@ -203,8 +203,7 @@ class TransactionForm(QMainWindow):
                     print(f"INFO: Model expects {len(TransactionForm.ml_features)} features: {TransactionForm.ml_features}")
                 else:
                     print("WARNING: Feature list ('features' key) not found in the loaded file. Assuming feature order is based on input field order.")
-                
-                # The warning check has been removed here.
+
 
             else:
                 print(f"ERROR: Object loaded from PKL file does not have a 'predict' method or 'model' key is missing.")
