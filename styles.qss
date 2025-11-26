@@ -1,0 +1,159 @@
+
+* {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 14pt;
+}
+
+/* --- Main Window Styling --- */
+#MainWindow {
+    background-color: #F0F4F8; /* Light background */
+}
+
+/* --- Header Label --- */
+#HeaderLabel {
+    font-size: 24pt;
+    font-weight: 600;
+    color: #1F2937; /* Dark text */
+    padding: 20px 0 10px 0;
+}
+
+/* --- Input Labels --- */
+#InputLabel {
+    color: #4B5563; /* Grey text */
+    font-size: 12pt;
+    font-weight: 500;
+}
+
+/* --- QLineEdit Input Fields --- */
+QLineEdit {
+    background-color: white;
+    border: 1px solid #D1D5DB; /* Light grey border */
+    border-radius: 8px; /* Rounded corners for the input fields */
+    padding: 10px 15px;
+    selection-background-color: #3B82F6;
+    color: #1F2937;
+    font-size: 12pt;
+}
+
+QLineEdit:focus {
+    border: 1px solid #3B82F6; /* Blue focus ring */
+}
+
+/* --- Buttons --- */
+QPushButton {
+    min-width: 120px;
+    padding: 12px 25px;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 12pt;
+    outline: none;
+}
+
+/* Submit Button (Primary) */
+#SubmitButton {
+    background-color: #3B82F6; /* Blue background */
+    color: white;
+    border: 2px solid #3B82F6;
+}
+
+#SubmitButton:hover {
+    background-color: #2563EB; /* Darker blue on hover */
+    border: 2px solid #2563EB;
+}
+
+#SubmitButton:pressed {
+    background-color: #1E40AF;
+}
+
+/* Clear Button (Secondary) */
+#ClearButton {
+    background-color: #F9FAFB;
+    color: #4B5563;
+    border: 2px solid #D1D5DB;
+}
+
+#ClearButton:hover {
+    background-color: #E5E7EB;
+}
+
+#ClearButton:pressed {
+    background-color: #D1D5DB;
+}
+
+/* -------------------------------------
+   --- Result Dialog (Pop-up Window) --- 
+   -------------------------------------*/
+QDialog {
+    background-color: white;
+    border-radius: 16px;
+    border: 1px solid #E5E7EB;
+}
+
+/* Result Label for Legitimate */
+#Legitimate {
+    color: #059669; /* Green for success */
+    font-size: 22pt;
+    font-weight: bold;
+    padding: 10px;
+}
+
+/* Result Label for Fraudulent */
+#Fraudulent {
+    color: #DC2626; /* Red for warning/fraud */
+    font-size: 22pt;
+    font-weight: bold;
+    padding: 10px;
+}
+
+#DetailMessage {
+    color: #6B7280;
+    font-size: 10pt;
+    font-style: italic;
+    margin-bottom: 20px;
+}
+
+#CloseButton {
+    background-color: #6B7280;
+    color: white;
+    border: 2px solid #6B7280;
+    min-width: 100px;
+}
+
+#CloseButton:hover {
+    background-color: #4B5563;
+    border: 2px solid #4B5563;
+}
+
+/* -------------------------------------
+   --- ERROR Dialog (Custom Input Error) --- 
+   -------------------------------------*/
+#ErrorDialog {
+    background-color: white;
+    border-radius: 16px;
+    border: 1px solid #D1D5DB; 
+}
+
+#ErrorIcon {
+    font-size: 24pt;
+    color: #DC2626; /* Red warning color */
+    padding-right: 15px;
+    padding-left: 20px;
+}
+
+#ErrorDetailMessage {
+    font-size: 12pt; 
+    color: #1F2937; /* Main dark text color */
+    padding: 20px 20px 20px 0;
+}
+
+#ErrorCloseButton {
+    background-color: #3B82F6;
+    color: white;
+    border: 2px solid #3B82F6;
+    min-width: 100px;
+}
+
+#ErrorCloseButton:hover {
+    background-color: #2563EB;
+    border: 2px solid #2563EB;
+}
