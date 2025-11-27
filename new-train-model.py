@@ -64,11 +64,9 @@ def weighted_adasyn(X, y, beta=1.0, k=5, weights=None):
 # -------------------------
 df = pd.read_csv("onlinefraud.csv")
 
-for col in df.select_dtypes(include=['object']).columns:
-    le = LabelEncoder()
-    df[col] = le.fit_transform(df[col])
+features = ["amount", "oldbalanceOrg", "newbalanceOrig", "oldbalanceDest", "newbalanceDest"]
 
-X = df.drop("isFraud", axis=1).values
+X = df[features].values
 y = df["isFraud"].values
 
 # -------------------------
