@@ -8,7 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.neighbors import NearestNeighbors
 
 # -------------------------
-# Weighted ADASYN function (Matched to enhanced-cart-simulation.ipynb)
+# Weighted ADASYN function
 # -------------------------
 
 def weighted_euclidean_distance(p, q, weights):
@@ -60,7 +60,7 @@ def weighted_adasyn(X, y, beta=1.0, k=5, weights=None):
     return X_new, y_new
 
 # -------------------------
-# Load dataset and Preprocessing (Matched to enhanced-cart-simulation.ipynb)
+# Load dataset and Preprocessing
 # -------------------------
 df = pd.read_csv("onlinefraud.csv")
 
@@ -72,7 +72,7 @@ X = df.drop("isFraud", axis=1).values
 y = df["isFraud"].values
 
 # -------------------------
-# Weighted ADASYN execution (Matched to enhanced-cart-simulation.ipynb parameters)
+# Weighted ADASYN execution
 # -------------------------
 feature_weights = np.ones(X.shape[1])
 print("Before ADASYN:", np.bincount(y))
@@ -81,7 +81,7 @@ print("After ADASYN :", np.bincount(y_resampled.astype(int)))
 
 
 # -------------------------
-# Train CART + AdaBoost with Regularized Gini (Matched to enhanced-cart-simulation.ipynb hyperparameters)
+# Train CART + AdaBoost with Regularized Gini
 # -------------------------
 cart = DecisionTreeClassifier(
     criterion="gini",
