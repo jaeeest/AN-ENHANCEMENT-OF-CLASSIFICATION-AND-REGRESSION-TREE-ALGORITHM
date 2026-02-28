@@ -1,89 +1,107 @@
 import numpy as np
 import pandas as pd
+import joblib
+import os
+from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import AdaBoostClassifier
-import joblib
-import time
+from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.neighbors import NearestNeighbors
+from collections import Counter
 
-# -------------------------
-# Weighted ADASYN function
-# -------------------------
-def weighted_euclidean_distance(p, q, weights):
-    return np.sqrt(np.sum(weights * (p - q) ** 2))
+# --- SOP 1: WEIGHTED ADASYN IMPLEMENTATION ---
+def weighted_adasyn(X, y, beta=0.8, k=5, weights=None, random_state=None):
+    np.random.seed(random_state)
+    class_counts = Counter(y)
+    major_class = max(class_counts, key=class_counts.get)
+    minor_class = min(class_counts, key=class_counts.get)
+    n_major, n_minor = class_counts[major_class], class_counts[minor_class]
 
-def weighted_adasyn(X, y, beta=1.0, k=5, weights=None):
-    from sklearn.neighbors import NearestNeighbors
-    X_min = X[y == 1]
-    X_maj = X[y == 0]
-    n_min, n_maj = len(X_min), len(X_maj)
-    G = int((n_maj - n_min) * beta)
-    if weights is None:
-        weights = np.ones(X.shape[1])
-    nn = NearestNeighbors(n_neighbors=k).fit(X)
-    synthetic = []
-    for xi in X_min:
-        distances, indices = nn.kneighbors([xi])
-        for idx in indices[0]:
-            if y[idx] == 0:  
-                continue
-            xj = X[idx]
-            diff = xj - xi
-            gap = np.random.rand()
-            new_point = xi + gap * diff
-            synthetic.append(new_point)
-            if len(synthetic) >= G:
-                break
-        if len(synthetic) >= G:
-            break
-    X_syn = np.array(synthetic)
-    y_syn = np.ones(len(X_syn))
-    return np.vstack([X, X_syn]), np.hstack([y, y_syn])
+    if n_minor >= n_major * beta: return X.copy(), y.copy()
+    G = int(n_major * beta) - n_minor
+    X_min = X[y == minor_class]
+    
+    if weights is not None:
+        sqrt_weights = np.sqrt(weights)
+        X_scaled, X_min_scaled = X * sqrt_weights, X_min * sqrt_weights
+    else:
+        X_scaled, X_min_scaled = X, X_min
+        
+    nn = NearestNeighbors(n_neighbors=k + 1).fit(X_scaled)
+    _, indices = nn.kneighbors(X_min_scaled)
+    ri_list = [np.sum(y[indices[i, 1:]] == major_class) / k for i in range(n_minor)]
+    ri_array = np.array(ri_list)
+    sum_ri = np.sum(ri_array)
+    ri_hat = ri_array / sum_ri if sum_ri > 0 else np.full(len(ri_array), 1/len(ri_array))
+    gi_array = np.round(G * ri_hat).astype(int)
 
-# -------------------------
-# Load dataset
-# -------------------------
+    X_synthetic = []
+    nn_minority = NearestNeighbors(n_neighbors=k + 1).fit(X_min_scaled)
+    for i in range(n_minor):
+        n_to_gen = gi_array[i]
+        if n_to_gen > 0:
+            _, min_idx = nn_minority.kneighbors([X_min_scaled[i]])
+            choices = np.random.choice(min_idx[0, 1:], n_to_gen, replace=True)
+            for idx in choices:
+                X_synthetic.append(X_min[i] + np.random.rand() * (X_min[idx] - X_min[i]))
+            
+    return np.vstack([X, np.array(X_synthetic)]), np.concatenate([y, np.full(len(X_synthetic), minor_class)])
+
+model_filename = 'enhanced_model.joblib'
+if os.path.exists(model_filename):
+    os.remove(model_filename)
+    print(f"Removed old version of {model_filename}")
+
+# --- DATA PREPROCESSING ---
 df = pd.read_csv("onlinefraud.csv")
 
-features = ["amount", "oldbalanceOrg", "newbalanceOrig", "oldbalanceDest", "newbalanceDest"]
-
-X = df[features].values
+features_for_ui = ["amount", "oldbalanceOrg", "newbalanceOrig", "oldbalanceDest", "newbalanceDest"]
+X = df[features_for_ui].values
 y = df["isFraud"].values
 
-feature_weights = np.ones(X.shape[1])
-
 print("Before ADASYN:", np.bincount(y))
-X_resampled, y_resampled = weighted_adasyn(X, y, beta=0.8, k=5, weights=feature_weights)
+feature_weights = np.ones(X.shape[1]) 
+X_resampled, y_resampled = weighted_adasyn(X, y, beta=0.8, k=5, weights=feature_weights, random_state=42)
 print("After ADASYN :", np.bincount(y_resampled.astype(int)))
 
-# -------------------------
-# Train CART + AdaBoost with Regularized Gini
-# -------------------------
+X_train, X_test, y_train, y_test = train_test_split(
+    X_resampled, 
+    y_resampled, 
+    test_size=0.3, 
+    stratify=y_resampled, 
+    random_state=42)
+
+# --- SOP 2: REGULARIZED GINI INDEX ---
 cart = DecisionTreeClassifier(
-    criterion="gini",
-    max_depth=5,
-    min_samples_split=10,
-    min_samples_leaf=5,
-    ccp_alpha=0.001,         # regularization
-    random_state=42
-)
+    criterion="gini", 
+    max_depth=5, 
+    min_samples_split=10, 
+    min_samples_leaf=5, 
+    ccp_alpha=0.001, # used to approximate regularized gini
+    random_state=42)
 
+# --- SOP 3: ADABOOST ---
 ada_cart = AdaBoostClassifier(
-    estimator=cart,
-    n_estimators=100,
-    learning_rate=0.5,
-    random_state=42
-)
+    estimator=cart, 
+    n_estimators=50, 
+    learning_rate=0.5, 
+    random_state=42)
 
-# Timing training
-print("Starting AdaBoost training...")
-start_time = time.time()
-ada_cart.fit(X_resampled, y_resampled.astype(int))
-end_time = time.time()
-print(f"Training finished in {end_time - start_time:.2f} seconds")
+print("\nTraining model on 5 features...")
+ada_cart.fit(X_train, y_train)
 
-# Timing saving
-print("💾 Saving model...")
-save_start = time.time()
-joblib.dump({"model": ada_cart, "features": features}, "enhanced_cart.pkl", compress=0)
-save_end = time.time()
-print(f"Model and features saved as enhanced_cart.pkl (took {save_end - save_start:.2f} seconds)")
+# --- EVALUATION ---
+y_pred = ada_cart.predict(X_test)
+print(f"Accuracy: {accuracy_score(y_test, y_pred):.4f}")
+print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
+
+# --- SAVE AND VERIFY ---
+joblib.dump(ada_cart, model_filename)
+
+verified_model = joblib.load(model_filename)
+print("\n" + "="*30)
+print(f"VERIFICATION SUCCESSFUL")
+print(f"Model saved as: {model_filename}")
+print(f"Features expected: {verified_model.n_features_in_}")
+print(f"Feature List: {features_for_ui}")
+print("="*30)
