@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 import joblib
 import numpy as np
@@ -6,7 +7,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QDialog, QTableView, QHeaderView,
     QMessageBox, QFrame, QGraphicsDropShadowEffect, QAbstractItemView,
-    QScrollArea
+    QScrollArea, QButtonGroup
 )
 from PyQt5.QtCore import Qt, QLocale, QRectF, QPointF, QSize
 from PyQt5.QtGui import QDoubleValidator, QColor, QFont, QPainter, QPen, QBrush
@@ -108,7 +109,6 @@ class VisualTreeDialog(QDialog):
         """Update canvas size based on zoom factor."""
         w = int(self.base_width * self.zoom_factor)
         h = int(self.base_height * self.zoom_factor)
-        # Cap to prevent overflow
         w = min(w, 32000)
         h = min(h, 32000)
         self.canvas.setFixedSize(w, h)
@@ -122,9 +122,7 @@ class VisualTreeDialog(QDialog):
             else:
                 self.zoom_factor /= 1.1
             
-            # Constraints
             self.zoom_factor = max(0.2, min(self.zoom_factor, 3.0))
-            
             self.update_canvas_size()
             self.canvas.update()
             event.accept()
@@ -140,8 +138,6 @@ class VisualTreeDialog(QDialog):
     def draw_tree_canvas(self, event):
         painter = QPainter(self.canvas)
         painter.setRenderHint(QPainter.Antialiasing)
-        
-        # Apply global scaling based on zoom
         painter.scale(self.zoom_factor, self.zoom_factor)
         
         if self.tree:
@@ -163,20 +159,16 @@ class VisualTreeDialog(QDialog):
             
             left_child = self.tree.children_left[node_id]
             right_child = self.tree.children_right[node_id]
-            
             goes_left = (val <= threshold)
 
-            # Draw Left Branch
             painter.setPen(QPen(QColor("#3b82f6" if goes_left else "#cbd5e1"), 5 if goes_left else 1.5))
             painter.drawLine(QPointF(x, y), QPointF(x - x_offset, y + v_gap))
             self.draw_node(painter, left_child, x - x_offset, y + v_gap, x_offset * 0.52, depth + 1)
 
-            # Draw Right Branch
             painter.setPen(QPen(QColor("#3b82f6" if not goes_left else "#cbd5e1"), 5 if not goes_left else 1.5))
             painter.drawLine(QPointF(x, y), QPointF(x + x_offset, y + v_gap))
             self.draw_node(painter, right_child, x + x_offset, y + v_gap, x_offset * 0.52, depth + 1)
 
-        # Draw the Node Circle
         if is_leaf:
             is_fraud = self.tree.value[node_id][0][1] > self.tree.value[node_id][0][0]
             painter.setBrush(QBrush(QColor("#ef4444" if is_fraud else "#10b981")))
@@ -186,7 +178,6 @@ class VisualTreeDialog(QDialog):
         painter.setPen(Qt.NoPen)
         painter.drawEllipse(QPointF(x, y), radius, radius)
 
-        # Draw Text inside the Node
         painter.setPen(QPen(Qt.white))
         painter.setFont(QFont("Segoe UI", 9, QFont.Bold))
         if is_leaf:
@@ -288,7 +279,6 @@ class TransactionForm(QMainWindow):
         self.setWindowTitle("Transaction Analysis System")
         self.setMinimumSize(1000, 850)
         
-        # Outer Scroll Area
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setFrameShape(QFrame.NoFrame)
@@ -305,19 +295,26 @@ class TransactionForm(QMainWindow):
         self.setup_form_ui()
         self.setup_table_ui()
 
-    # --- LOAD MODEL ---
     def load_model(self):
-        model_filename = 'base_model.joblib'
+        self.models = {"Base": None, "Enhanced": None}
         try:
-            data = joblib.load(model_filename)
-            if isinstance(data, dict) and 'model' in data:
-                TransactionForm.ml_model = data.get("model")
-            elif hasattr(data, 'predict'):
-                TransactionForm.ml_model = data
-            print("INFO: Model initialized successfully.")
+            # Try load Base
+            base_data = joblib.load('base_model.joblib')
+            self.models["Base"] = base_data.get("model") if isinstance(base_data, dict) else base_data
+            
+            # Try load Enhanced
+            enh_data = joblib.load('enhanced_model.joblib')
+            self.models["Enhanced"] = enh_data.get("model") if isinstance(enh_data, dict) else enh_data
+            
+            TransactionForm.ml_model = self.models["Base"]
+            print("INFO: Models initialized successfully.")
         except Exception as e:
-            print("ERROR: Model is not loaded. Analysis will not be available.")
+            print(f"ERROR: Model loading failed: {e}")
             TransactionForm.ml_model = None
+
+    def switch_engine(self, mode_name):
+        TransactionForm.ml_model = self.models.get(mode_name)
+        print(f"\n[SYSTEM]: Switched to {mode_name} Engine.")
 
     def setup_form_ui(self):
         self.form_card = QFrame()
@@ -336,6 +333,39 @@ class TransactionForm(QMainWindow):
         sub_label.setStyleSheet("color: #64748b; font-size: 10pt; margin-bottom: 15px;")
         form_layout.addWidget(sub_label)
 
+        # --- SWITCHER UI ---
+        mode_layout = QHBoxLayout()
+        mode_label = QLabel("Analysis Engine:")
+        mode_label.setStyleSheet("font-weight: bold; color: #475569;")
+        
+        self.base_mode_btn = QPushButton("Base")
+        self.enh_mode_btn = QPushButton("Enhanced")
+        
+        btn_style = """
+            QPushButton { padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; background: #f8fafc; }
+            QPushButton:checked { background-color: #3b82f6; color: white; border-color: #2563eb; font-weight: bold; }
+        """
+        self.base_mode_btn.setCheckable(True)
+        self.enh_mode_btn.setCheckable(True)
+        self.base_mode_btn.setChecked(True)
+        self.base_mode_btn.setStyleSheet(btn_style)
+        self.enh_mode_btn.setStyleSheet(btn_style)
+        
+        self.mode_group = QButtonGroup(self)
+        self.mode_group.addButton(self.base_mode_btn)
+        self.mode_group.addButton(self.enh_mode_btn)
+        self.mode_group.setExclusive(True)
+        
+        mode_layout.addWidget(mode_label)
+        mode_layout.addWidget(self.base_mode_btn)
+        mode_layout.addWidget(self.enh_mode_btn)
+        mode_layout.addStretch()
+        form_layout.addLayout(mode_layout)
+
+        self.base_mode_btn.clicked.connect(lambda: self.switch_engine("Base"))
+        self.enh_mode_btn.clicked.connect(lambda: self.switch_engine("Enhanced"))
+        # -------------------
+
         self.fields = [
             ("Transaction Amount", "e.g. 500.00"),
             ("Customer Old Balance", "e.g. 1200.50"),
@@ -352,7 +382,6 @@ class TransactionForm(QMainWindow):
         for label_text, placeholder in self.fields:
             row_layout = QHBoxLayout()
             row_layout.setSpacing(20)
-            
             lbl = QLabel(label_text)
             lbl.setFixedWidth(180)
             lbl.setStyleSheet("font-size: 11pt; color: #475569; font-weight: 500;")
@@ -362,13 +391,9 @@ class TransactionForm(QMainWindow):
             edit.setPlaceholderText(placeholder)
             edit.setFixedHeight(45)
             edit.setStyleSheet("""
-                QLineEdit {
-                    border: 1px solid #d1d5db; border-radius: 6px;
-                    padding-left: 12px; font-size: 11pt; background-color: #ffffff;
-                }
+                QLineEdit { border: 1px solid #d1d5db; border-radius: 6px; padding-left: 12px; font-size: 11pt; background-color: #ffffff; }
                 QLineEdit:focus { border: 2px solid #3b82f6; }
             """)
-            
             row_layout.addWidget(lbl)
             row_layout.addWidget(edit)
             self.line_edits[label_text] = edit
@@ -382,10 +407,7 @@ class TransactionForm(QMainWindow):
         self.submit_btn.setFixedHeight(45)
         self.submit_btn.setFixedWidth(180)
         self.submit_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #3b82f6; color: white; border-radius: 6px;
-                font-size: 11pt; font-weight: bold;
-            }
+            QPushButton { background-color: #3b82f6; color: white; border-radius: 6px; font-size: 11pt; font-weight: bold; }
             QPushButton:hover { background-color: #2563eb; }
         """)
         self.submit_btn.clicked.connect(self.submit_transaction)
@@ -394,10 +416,7 @@ class TransactionForm(QMainWindow):
         self.clear_btn.setFixedHeight(45)
         self.clear_btn.setFixedWidth(100)
         self.clear_btn.setStyleSheet("""
-            QPushButton {
-                background-color: transparent; color: #3b82f6;
-                font-size: 11pt; font-weight: 500; border: none;
-            }
+            QPushButton { background-color: transparent; color: #3b82f6; font-size: 11pt; font-weight: 500; border: none; }
             QPushButton:hover { color: #1d4ed8; text-decoration: underline; }
         """)
         self.clear_btn.clicked.connect(self.clear_fields)
@@ -424,11 +443,7 @@ class TransactionForm(QMainWindow):
         self.delete_btn = QPushButton("Delete")
         self.delete_btn.setFixedWidth(100)
         self.delete_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #fee2e2; color: #dc2626;
-                border: 1px solid #fecaca; border-radius: 6px;
-                font-weight: bold; padding: 6px;
-            }
+            QPushButton { background-color: #fee2e2; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; font-weight: bold; padding: 6px; }
             QPushButton:hover { background-color: #fecaca; }
         """)
         self.delete_btn.clicked.connect(self.delete_selected_transaction)
@@ -449,8 +464,6 @@ class TransactionForm(QMainWindow):
 
         self.table_view = QTableView()
         self.table_view.setModel(self.model)
-        self.table_view.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.table_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.table_view.setFixedHeight(500)
         self.table_view.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table_view.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -460,15 +473,8 @@ class TransactionForm(QMainWindow):
         self.table_view.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         
         self.table_view.setStyleSheet("""
-            QTableView {
-                border: 1px solid #e2e8f0; background-color: white;
-                selection-background-color: #3b82f6; selection-color: #ffffff;
-                font-size: 10pt; color: #334155; outline: none;
-            }
-            QHeaderView::section {
-                background-color: #f8fafc; padding: 10px; border: none;
-                border-bottom: 2px solid #e2e8f0; font-weight: bold; color: #475569;
-            }
+            QTableView { border: 1px solid #e2e8f0; background-color: white; selection-background-color: #3b82f6; selection-color: #ffffff; font-size: 10pt; color: #334155; outline: none; }
+            QHeaderView::section { background-color: #f8fafc; padding: 10px; border: none; border-bottom: 2px solid #e2e8f0; font-weight: bold; color: #475569; }
         """)
         
         table_layout.addWidget(self.table_view)
@@ -495,14 +501,11 @@ class TransactionForm(QMainWindow):
         result_text = "FRAUDULENT" if is_fraud else "LEGITIMATE"
         confidence = probs[1] if is_fraud else probs[0]
 
-        # --- FEATURE IMPORTANCE CALCULATION ---
         importances = TransactionForm.ml_model.feature_importances_
         feat_map = list(zip(self.ml_features, importances))
         feat_map.sort(key=lambda x: x[1], reverse=True)
-        
         top_feature_name, top_feature_val = feat_map[0]
 
-        # --- TERMINAL EVALUATION REPORT ---
         print("\n" + "="*60)
         print("    FRAUD EVALUATION")
         print("="*60)
@@ -548,10 +551,8 @@ class TransactionForm(QMainWindow):
         model = TransactionForm.ml_model
         try:
             input_values = [
-                data["Transaction Amount"], 
-                data["Customer Old Balance"],
-                data["Customer New Balance"], 
-                data["Recipient Old Balance"], 
+                data["Transaction Amount"], data["Customer Old Balance"],
+                data["Customer New Balance"], data["Recipient Old Balance"], 
                 data["Recipient New Balance"]
             ]
             input_array = np.array([input_values])
